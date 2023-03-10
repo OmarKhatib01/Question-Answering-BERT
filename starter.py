@@ -109,14 +109,17 @@ def main():
     # linear = linear.cuda()
 
     optimizer = optim.Adam(linear.parameters(), lr=3e-5)
+    print("Model Initialized")
 
 
     losses = []
     accuracies = []
     for epoch in range(15):
+        print(f"Starting training epoch {epoch}")
         epoch_loss = train_classification(model, linear, train, tokenizer, optimizer, mode='train')
         
         with torch.no_grad():
+            print(f"Validating epoch {epoch}")
             epoch_acc = train_classification(model, linear, valid, tokenizer, optimizer, mode='validate')
             losses.append(np.copy(epoch_loss))
             accuracies.append(np.copy(epoch_acc))
@@ -187,50 +190,21 @@ def train_classification(model, linear, data, tokenizer, optimizer, mode='train'
             probs = logits.softmax(dim=1)
             maxind_pred = torch.argmax(probs, dim=0)[1]
             maxind_true = torch.argmax(labels, dim=0)
-            if i == 10:
-                print(f"Pred: {maxind_pred}, True: {maxind_true}\n{probs}")
+            # if i == 10:
+            #     print(f"Pred: {maxind_pred}, True: {maxind_true}\n{probs}")
 
             if maxind_pred == maxind_true:
                 correct += 1
 
         total += 1
     
-    if mode == 'train':
-        return total_epoch_loss/total
-    else: # mode == 'validate'
-        return correct/total
+    metric = total_epoch_loss/total if mode == 'train' else correct/total
+    return metric
 
 # def train_generation(model, linear, data, tokenizer, optimizer, mode='train'):
 
-
-    
 #    Add code to fine-tune and test your MCQA classifier.
            
                  
 if __name__ == "__main__":
     main()
-
-
-
-            # mask is matrix of (num_questions, classes) where 1 means that the question has that class as label
-            # mask = torch.zeros(len(obs), 2)
-            # for j in range(len(obs)):
-            #     mask[j, labels[j]] = 1
-
-            # labels = labels.cuda()
-            # mask = mask.cuda()
-
-            # inputs['input_ids'] = inputs['input_ids'].cuda()
-            # inputs['attention_mask'] = inputs['attention_mask'].cuda()
-            # inputs['token_type_ids'] = inputs['token_type_ids'].cuda()
-
-            # logits = torch.matmul(last_hidden, linear)
-            # logits = torch.exp(logits)
-            # denom = torch.sum(logits, 1) #denom; sum logits over dim 1
-            # denom = denom.unsqueeze(1) #unsqueeze - reinflate dim 1
-            # numer = logits
-            # probs = numer / denom
-            # probs = probs * mask
-            # probs = torch.sum(probs, 1)
-            # log_probs = -1*torch.log(probs)
-            # loss2 = torch.sum(log_probs, 0)/4
