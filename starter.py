@@ -38,17 +38,6 @@ def main():
                 label = 0
             obs.append([text,label])
         train.append(obs)
-        
-        # print(obs)
-        print(' ')
-
-        # print(' ',result['question']['choices'][0]['label'],result['question']['choices'][0]['text'])
-        # print(' ',result['question']['choices'][1]['label'],result['question']['choices'][1]['text'])
-        # print(' ',result['question']['choices'][2]['label'],result['question']['choices'][2]['text'])
-        # print(' ',result['question']['choices'][3]['label'],result['question']['choices'][3]['text'])
-        # print('  Fact: ',result['fact1'])
-        # print('  Answer: ',result['answerKey'])
-        # print('  ')
 
     # making valid data   
     file_name = 'dev_complete.jsonl'        
