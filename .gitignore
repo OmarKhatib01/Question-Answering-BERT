@@ -1,1 +1,4 @@
 env/
+*.pt
+HW#2.pdf
+.DS_Store
