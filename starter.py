@@ -96,16 +96,24 @@ def main():
     # classification training  parameters
     tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
     model = BertModel.from_pretrained("bert-base-uncased")
-    optimizer = optim.Adam(model.parameters(), lr=3e-5)
 
     for param in model.parameters():
         param.requires_grad = False
 
-    linear = torch.rand(768,2, requires_grad=True)
+    linear = torch.nn.Linear(768,2)
+
+    for param in linear.parameters():
+        param.requires_grad = True
+
+    # model = model.cuda()
+    # linear = linear.cuda()
+
+    optimizer = optim.Adam(linear.parameters(), lr=3e-5)
+
 
     losses = []
     accuracies = []
-    for epoch in range(10):
+    for epoch in range(15):
         epoch_loss = train_classification(model, linear, train, tokenizer, optimizer, mode='train')
         
         with torch.no_grad():
@@ -139,11 +147,17 @@ def train_classification(model, linear, data, tokenizer, optimizer, mode='train'
     correct = 0
     total_epoch_loss = 0
 
+    # for calculating avg loss every N iterations
+    interval_loss = 0
+    iters = 0
+
     for i in range(len(data)):
         
         obs = data[i]
         text = [x[0] for x in obs]
         labels = torch.tensor([x[1] for x in obs])
+        # labels = labels.cuda()
+
 
         inputs = tokenizer(text, padding='max_length', max_length=256, truncation=True, return_tensors="pt")
         
@@ -151,7 +165,8 @@ def train_classification(model, linear, data, tokenizer, optimizer, mode='train'
         outputs = model(**inputs)
 
         last_hidden = outputs.last_hidden_state[:,0,:]
-        logits = torch.matmul(last_hidden,linear)
+        # logits = torch.matmul(last_hidden,linear)
+        logits = linear(last_hidden)
 
         loss = torch.nn.functional.cross_entropy(logits, labels)
         total_epoch_loss += loss
@@ -159,17 +174,25 @@ def train_classification(model, linear, data, tokenizer, optimizer, mode='train'
         if mode == 'train':
             loss.backward()
             optimizer.step()
-            if i % 100 == 0:
-                print("Iter ", i, " | Loss ", loss.item())
+            
+            interval_loss += loss.item()
+            iters += 1
+
+            if i % 500 == 0 or i == len(data)-1:
+                print("Iter ", i, " | Loss ", interval_loss/iters)
+                iters = 0
+                interval_loss = 0
         else: #mode == 'validate'
             # get prediction
             probs = logits.softmax(dim=1)
             maxind_pred = torch.argmax(probs, dim=0)[1]
             maxind_true = torch.argmax(labels, dim=0)
-            print(f"Pred: {maxind_pred}, True: {maxind_true}")
+            if i == 10:
+                print(f"Pred: {maxind_pred}, True: {maxind_true}\n{probs}")
 
             if maxind_pred == maxind_true:
                 correct += 1
+
         total += 1
     
     if mode == 'train':
