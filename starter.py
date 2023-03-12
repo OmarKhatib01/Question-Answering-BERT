@@ -237,11 +237,11 @@ class Generate():
         # self.preprocess_data_text_file('train')
 
         command = \
-            "python3 -u transformers/examples/pytorch/language-modeling/run_clm.py \
+            "python3 -u models/transformers/examples/pytorch/language-modeling/run_clm.py \
             --model_name_or_path gpt2 \
             --train_file data/train.txt \
             --do_train \
-            --output_dir save/gpt497-2 \
+            --output_dir models/gpt497 \
             --per_device_train_batch_size 2 \
             --num_train_epochs 5\
             >& save/output.log"
@@ -280,7 +280,7 @@ class Generate():
             return accuracy
         
     def test(self):
-        saved_model = GPT2LMHeadModel.from_pretrained('save/gpt497')
+        saved_model = GPT2LMHeadModel.from_pretrained('models/gpt497')
         valid_acc = self.evaluate(saved_model, self.valid_set, self.tokenizer)
         test_acc = self.evaluate(saved_model, self.test_set, self.tokenizer)
 
@@ -295,11 +295,11 @@ def create_plots():
     plt.savefig('save/classifier_train_test_acc.png')
                  
 if __name__ == "__main__":
-    classifier = Classify()
-    # classifier.train()
-    valid_acc, test_acc = classifier.test()
-    print(f"CLASSIFIER Validation accuracy: {valid_acc} | Test accuracy: {test_acc}")
-    create_plots()
+    # classifier = Classify()
+    # # classifier.train()
+    # valid_acc, test_acc = classifier.test()
+    # print(f"CLASSIFIER Validation accuracy: {valid_acc} | Test accuracy: {test_acc}")
+    # create_plots()
 
     generator = Generate()
     # generator.train()
