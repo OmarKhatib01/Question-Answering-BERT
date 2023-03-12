@@ -2,3 +2,6 @@ env/
 *.pt
 HW#2.pdf
 .DS_Store
+transformers/
+save/gpt497-2/
+save/gpt497/
