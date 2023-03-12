@@ -7,6 +7,8 @@ import numpy as np
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
+import random
+import torch.nn as nn
 
 class Classify():  
     def __init__(self):
@@ -236,20 +238,42 @@ class Generate():
     def train(self):
         # self.preprocess_data_text_file('train')
 
-        command = \
-            "python3 -u models/transformers/examples/pytorch/language-modeling/run_clm.py \
-            --model_name_or_path gpt2 \
-            --train_file data/train.txt \
-            --do_train \
-            --output_dir models/gpt497 \
-            --per_device_train_batch_size 2 \
-            --num_train_epochs 5\
-            >& save/output.log"
-        os.system(command)
+        # command = \
+        #     "python3 -u models/transformers/examples/pytorch/language-modeling/run_clm.py \
+        #     --model_name_or_path gpt2 \
+        #     --train_file data/train.txt \
+        #     --do_train \
+        #     --output_dir models/gpt497 \
+        #     --per_device_train_batch_size 2 \
+        #     --num_train_epochs 5\
+        #     >& save/output.log"
+        # os.system(command)
 
         # for i in range(1):
         #     print(f"Epoch {i}")
         #     print(f"Validation accuracy: {self.evaluate_model(self.model, self.valid_set, self.tokenizer)}")
+
+        train_loss = []
+        train_accuracy = []
+        valid_accuracy = []
+        for epoch in range(15):
+            print(f"Starting training epoch {epoch}")
+            epoch_train_loss, epoch_train_accuracy = self.train_generation(self.model, self.train_set, self.tokenizer, self.optimizer)
+            
+            with torch.no_grad():
+                print(f"Validating epoch {epoch}")
+                epoch_valid_accuracy = self.evaluate_model(self.model, self.linear, self.valid_set, self.tokenizer)
+                train_loss.append(np.copy(epoch_train_loss))
+                train_accuracy.append(np.copy(epoch_train_accuracy))
+                valid_accuracy.append(np.copy(epoch_valid_accuracy))
+
+                if epoch == 0 or (epoch > 0 and valid_accuracy[-1] > valid_accuracy[-2]):
+                    print("Saving model...")
+                    torch.save(self.linear.state_dict(), 'save/gen_linear.pt')
+                pd.DataFrame({'train_loss': train_loss, 'train_accuracy': train_accuracy, 'valid_accuracy': valid_accuracy}).to_csv('save/gen_results.csv', index=False)
+            
+            print(f'Epoch: {epoch} complete | Train Loss: {train_loss[-1]} | Train Accuracy: {train_accuracy[-1]} | Valid Accuracy: {valid_accuracy[-1]}')
+
 
     def evaluate(self, model, data, tokenizer):
         model.eval()
@@ -286,6 +310,103 @@ class Generate():
 
         return valid_acc, test_acc
 
+    def train_generation(self, model, data, tokenizer, optimizer, mode='train'):
+        # generation training parameters
+        tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+        model = GPT2LMHeadModel.from_pretrained('gpt2')
+        linear = nn.Linear(768, 4)
+        optimizer = optim.Adam(linear.parameters(), lr=3e-5)
+        loss_fn = torch.nn.CrossEntropyLoss()
+
+        device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+        model = model.to(device)
+        linear = linear.to(device)
+
+        if mode == 'train':
+            model.train()
+        else:
+            model.eval()
+
+        losses = []
+        accuracies = []
+
+        for i in range(len(data)):
+            obs = data[i]
+            inputs = tokenizer(obs[:-1], truncation=True, return_tensors="pt")
+            label = tokenizer(obs[-1], truncation=True, return_tensors="pt")['input_ids'][0][0]
+
+            inputs = inputs.to(device)
+            label = label.to(device)
+
+            outputs = model(**inputs)
+            pred_logits = outputs.logits[0][-1]
+            vocab_probs = torch.softmax(pred_logits, dim=0)
+            label_probs = [vocab_probs[self.label_inds[key]] for key in self.label_inds.keys()]
+
+            pred_label_ind = torch.argmax(torch.tensor(label_probs), dim=0)
+            pred_label = torch.tensor(list(self.label_inds.values()))[pred_label_ind]
+
+            linear_input = outputs.last_hidden_state.mean(dim=1) # average across sequence length
+            linear_input = linear_input.to(device)
+
+            linear_output = linear(linear_input)
+            loss = loss_fn(linear_output.unsqueeze(0), label.unsqueeze(0))
+
+            if mode == 'train':
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+            losses.append(loss.item())
+
+            if pred_label == label:
+                accuracies.append(1)
+            else:
+                accuracies.append(0)
+
+        accuracy = sum(accuracies)/len(data)
+
+        return accuracy, losses
+
+
+
+    # def train_generation(model, linear, data, tokenizer, optimizer, mode='train'):
+    #     # generation training parameters
+    #     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+    #     # model = GPT2LMHeadModel.from_pretrained('gpt2')
+    #     model = GPT2LMHeadModel.from_pretrained('gpt2_497')
+    #     optimizer = optim.Adam(model.parameters(), lr=3e-5)
+    #     # Add code to fine-tune and test your MCQA classifier.
+
+    #     device = torch.device("cuda")
+    #     model.cuda()
+    #     random.seed(42)
+    #     np.random.seed(42)
+    #     torch.manual_seed(42)
+    #     torch.cuda.manual_seed_all(42)
+
+    #     model = model.to(device)
+    #     epochs = 5
+    #     for epoch_i in range(0, epochs):
+
+    #     # ========================================
+    #     #               Training
+    #     # ========================================
+
+
+
+
+
+        
+    #     # configuration = GPT2Config.from_pretrained('gpt2', output_hidden_states=False)
+    #     # model = GPT2LMHeadModel.from_pretrained("gpt2", config=configuration)
+    #     # model.resize_token_embeddings(len(tokenizer))
+
+        
+
+
+
+
 def create_plots():
     # Create plots from results.csv
     df = pd.read_csv('save/results.csv')
@@ -295,16 +416,16 @@ def create_plots():
     plt.savefig('save/classifier_train_test_acc.png')
                  
 if __name__ == "__main__":
-    classifier = Classify()
-    # classifier.train()
-    valid_acc, test_acc = classifier.test()
-    print(f"CLASSIFIER Validation accuracy: {valid_acc} | Test accuracy: {test_acc}")
-    create_plots()
+    # classifier = Classify()
+    # # classifier.train()
+    # valid_acc, test_acc = classifier.test()
+    # print(f"CLASSIFIER Validation accuracy: {valid_acc} | Test accuracy: {test_acc}")
+    # create_plots()
 
     generator = Generate()
-    # generator.train()
-    valid_acc, test_acc = generator.test()
-    print(f"GENERATOR Validation accuracy: {valid_acc} | Test accuracy: {test_acc}")
+    generator.train()
+    # valid_acc, test_acc = generator.test()
+    # print(f"GENERATOR Validation accuracy: {valid_acc} | Test accuracy: {test_acc}")
 
 
 
