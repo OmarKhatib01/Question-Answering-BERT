@@ -295,11 +295,11 @@ def create_plots():
     plt.savefig('save/classifier_train_test_acc.png')
                  
 if __name__ == "__main__":
-    # classifier = Classify()
-    # # classifier.train()
-    # valid_acc, test_acc = classifier.test()
-    # print(f"CLASSIFIER Validation accuracy: {valid_acc} | Test accuracy: {test_acc}")
-    # create_plots()
+    classifier = Classify()
+    # classifier.train()
+    valid_acc, test_acc = classifier.test()
+    print(f"CLASSIFIER Validation accuracy: {valid_acc} | Test accuracy: {test_acc}")
+    create_plots()
 
     generator = Generate()
     # generator.train()
