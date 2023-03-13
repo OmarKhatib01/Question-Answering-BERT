@@ -1,5 +1,6 @@
 from transformers import AutoTokenizer, BertModel, GPT2LMHeadModel, GPT2Tokenizer
 import torch.optim as optim
+from torch.autograd import Variable
 
 import torch
 import json
@@ -179,8 +180,10 @@ class Classify():
 
 class Generate():
     def __init__(self):
-        self.model = GPT2LMHeadModel.from_pretrained('gpt2')
+        # self.model = GPT2LMHeadModel.from_pretrained('gpt2')
         self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+        self.model = GPT2LMHeadModel.from_pretrained('gpt2')
+
         self.optimizer = optim.Adam(self.model.parameters(), lr=3e-5)
         self.loss = torch.nn.CrossEntropyLoss()
 
@@ -249,22 +252,39 @@ class Generate():
         #     >& save/output.log"
         # os.system(command)
 
+        # command = \
+        #     "python3 -u models/transformers/examples/pytorch/question-answering/run_qa.py \
+        #     --model_name_or_path bert-base-uncased \
+        #     --train_file data/train.txt \
+        #     --do_train \
+        #     --output_dir models/gpt497-gen \
+        #     --per_device_train_batch_size 12 \
+        #     --learning_rate 3e-5 \
+        #     --max_seq_length 384 \
+        #     --doc_stride 128 \
+        #     --num_train_epochs 2\
+        #     >& save/output.log"
+        # os.system(command)
+  
+
         # for i in range(1):
         #     print(f"Epoch {i}")
         #     print(f"Validation accuracy: {self.evaluate_model(self.model, self.valid_set, self.tokenizer)}")
+
 
         train_loss = []
         train_accuracy = []
         valid_accuracy = []
         for epoch in range(1):     # 15
             print(f"Starting training epoch {epoch}")
-            epoch_train_loss, epoch_train_accuracy = self.train_generation(self.model, self.train_set, self.tokenizer, self.optimizer)
+            # epoch_train_loss, epoch_train_accuracy = self.train_generation(self.model, self.train_set, self.tokenizer, self.optimizer)
+            epoch_train_loss = self.train_generation(self.model, self.train_set, self.tokenizer, self.optimizer)
             
             with torch.no_grad():
                 print(f"Validating epoch {epoch}")
                 # epoch_valid_accuracy = self.evaluate_model(self.model, self.linear, self.valid_set, self.tokenizer)
                 train_loss.append(np.copy(epoch_train_loss))
-                train_accuracy.append(np.copy(epoch_train_accuracy))
+                # train_accuracy.append(np.copy(epoch_train_accuracy))
                 # valid_accuracy.append(np.copy(epoch_valid_accuracy))
 
                 # if epoch == 0 or (epoch > 0 and valid_accuracy[-1] > valid_accuracy[-2]):
@@ -286,8 +306,7 @@ class Generate():
 
             # for calculating avg accuracy every N iterations
             correct_preds = 0
-
-            for i in range(len(data)):
+            for i in range(1):  # len(data)
                 obs = data[i]
                 inputs = tokenizer(obs[:-1], truncation=True, return_tensors="pt")
                 label = tokenizer(obs[-1], truncation=True, return_tensors="pt")['input_ids'][0][0]
@@ -303,6 +322,16 @@ class Generate():
                 if pred_label == label:
                     correct_preds += 1
                     # print(self.labels[pred_label-32], self.labels[label-32], 'Correct')
+
+                print('obs: ', obs )
+                print("===============")
+                print('input: ', obs[:-1])
+                print("===============")
+                print('label: ', obs[-1])
+                print("===============")
+                print('pred_label: ', pred_label)
+                print('tokenizer.decode(pred_label --> ', tokenizer.decode(pred_label, skip_special_tokens=True))
+                print("===============")
             
             accuracy = correct_preds/len(data)
             return accuracy
@@ -334,59 +363,145 @@ class Generate():
         losses = []
         accuracies = []
 
-        for i in range(len(data)):
+        loss = torch.zeros(1, requires_grad=True)
+        
+
+        for i in range(len(data)):   # len(data)
             obs = data[i]
             inputs = tokenizer(obs[:-1], truncation=True, return_tensors="pt")
+            # inputs = tokenizer.encode(''.join(obs[:-1]), truncation=True, return_tensors="pt")
             label = tokenizer(obs[-1], truncation=True, return_tensors="pt")['input_ids'][0][0]
+            # label = tokenizer.encode(''.join(obs[-1]), truncation=True, return_tensors="pt")
 
             inputs = inputs.to(device)
             label = label.to(device)
 
-            outputs = model(**inputs)
-            # outputs = model.generate(**inputs, max_length=len(inputs['input_ids'][0]+1))
+            optimizer.zero_grad()
 
-            pred_logits = outputs.logits[0][-1]
-            # pred_logits = outputs[0][-1].float().unsqueeze(0)
+            # outputs = model(**inputs)
+            outputs = model.generate(**inputs, max_length=len(inputs['input_ids'][0])+1, 
+                                     return_dict_in_generate=True, output_scores=True)
             
-            vocab_probs = torch.softmax(pred_logits, dim=0)
-            label_probs = [vocab_probs[self.label_inds[key]] for key in self.label_inds.keys()]
+            # beam_output = model.generate(inputs, max_length=len(inputs[0])+1, 
+            #                              num_beams=5, early_stopping=True)
 
-            pred_label_ind = torch.argmax(torch.tensor(label_probs), dim=0)
-            pred_label = torch.tensor(list(self.label_inds.values()))[pred_label_ind]
+            scores = outputs.scores[0]
+
+            vocab_probs = torch.softmax(scores, dim=1)
+            
+            # label_probs = [vocab_probs[0][self.label_inds[key]] for key in self.label_inds.keys()]
+
+            # pred_label_ind = torch.argmax(torch.tensor(label_probs), dim=0)
+            # pred_label = torch.tensor(list(self.label_inds.values()))[pred_label_ind]
+            
+            loss = self.loss(vocab_probs, torch.tensor([label], requires_grad = True))
+            # loss = Variable(loss, requires_grad = True)
+            # loss.requires_grad = True
+            
+            
+            print(loss)
+            print('===============')
+
+            loss.backward()
+            optimizer.step()
 
             # linear_input = outputs.last_hidden_state.mean(dim=1) # average across sequence length
             # linear_input = linear_input.to(device)
 
             # linear_output = linear(linear_input)
             # loss = loss_fn(linear_output.unsqueeze(0), label.unsqueeze(0))
-            loss = self.loss(pred_label.float().unsqueeze(0), label.float().unsqueeze(0))
 
-            # print(obs)
-            # print('===============')
-            # print(obs[-1])
-            # print('===============')
-            # print(label)
-            # print('===============')
-            # print(pred_label)
-            # print('===============')
-
-            if mode == 'train':
-                optimizer.zero_grad()
-                # loss.backward()
-                optimizer.step()
+            # if mode == 'train':
+            #     optimizer.zero_grad()
+            #     loss.backward()
+            #     optimizer.step()
 
             losses.append(loss.item())
 
-            if pred_label == label:
-                accuracies.append(1)
-            else:
-                accuracies.append(0)
+        #     if pred_label == label:
+        #         accuracies.append(1)
+        #     else:
+        #         accuracies.append(0)
 
-        accuracy = sum(accuracies)/len(data)
+        # accuracy = sum(accuracies)/len(data)
 
-        return accuracy, losses
+        # return accuracy, losses
+        return losses
 
+    # def train_generation(self, model, data, tokenizer, optimizer, mode='train'):
+    #     # generation training parameters
+    #     # tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+    #     # model = GPT2LMHeadModel.from_pretrained('gpt2')
+    #     # linear = nn.Linear(768, 4)
+    #     # optimizer = optim.Adam(model.parameters(), lr=3e-5)
+    #     # loss_fn = torch.nn.CrossEntropyLoss()
 
+    #     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    #     model = model.to(device)
+    #     # linear = linear.to(device)
+
+    #     if mode == 'train':
+    #         model.train()
+    #     else:
+    #         model.eval()
+
+    #     losses = []
+    #     accuracies = []
+
+    #     for i in range(3):   # len(data)
+    #         obs = data[i]
+    #         inputs = tokenizer(obs[:-1], truncation=True, return_tensors="pt")
+    #         label = tokenizer(obs[-1], truncation=True, return_tensors="pt")['input_ids'][0][0]
+
+    #         inputs = inputs.to(device)
+    #         label = label.to(device)
+
+    #         outputs = model(**inputs)
+    #         # outputs = model(inputs, output_hidden_states=True, return_dict=True)
+    #         # outputs = model.generate(**inputs, max_length=len(inputs['input_ids'][0]+1))
+
+    #         print(outputs.last_hidden_state[:,0,:])
+    #         print("==============")
+    #         pred_logits = outputs.logits[0][-1]
+    #         # pred_logits = outputs[0][-1].float().unsqueeze(0)
+            
+    #         vocab_probs = torch.softmax(pred_logits, dim=0)
+    #         label_probs = [vocab_probs[self.label_inds[key]] for key in self.label_inds.keys()]
+
+    #         pred_label_ind = torch.argmax(torch.tensor(label_probs), dim=0)
+    #         pred_label = torch.tensor(list(self.label_inds.values()))[pred_label_ind]
+
+    #         # linear_input = outputs.last_hidden_state.mean(dim=1) # average across sequence length
+    #         # linear_input = linear_input.to(device)
+
+    #         # linear_output = linear(linear_input)
+    #         # loss = loss_fn(linear_output.unsqueeze(0), label.unsqueeze(0))
+    #         loss = self.loss(pred_label.float().unsqueeze(0), label.float().unsqueeze(0))
+
+    #         # print(obs)
+    #         # print('===============')
+    #         # print(obs[-1])
+    #         # print('===============')
+    #         # print(label)
+    #         # print('===============')
+    #         # print(pred_label)
+    #         # print('===============')
+
+    #         if mode == 'train':
+    #             optimizer.zero_grad()
+    #             # loss.backward()
+    #             optimizer.step()
+
+    #         losses.append(loss.item())
+
+    #         if pred_label == label:
+    #             accuracies.append(1)
+    #         else:
+    #             accuracies.append(0)
+
+    #     accuracy = sum(accuracies)/len(data)
+
+    #     return accuracy, losses
 
     
 
