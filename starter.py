@@ -256,23 +256,27 @@ class Generate():
         train_loss = []
         train_accuracy = []
         valid_accuracy = []
-        for epoch in range(15):
+        for epoch in range(1):     # 15
             print(f"Starting training epoch {epoch}")
             epoch_train_loss, epoch_train_accuracy = self.train_generation(self.model, self.train_set, self.tokenizer, self.optimizer)
             
             with torch.no_grad():
                 print(f"Validating epoch {epoch}")
-                epoch_valid_accuracy = self.evaluate_model(self.model, self.linear, self.valid_set, self.tokenizer)
+                # epoch_valid_accuracy = self.evaluate_model(self.model, self.linear, self.valid_set, self.tokenizer)
                 train_loss.append(np.copy(epoch_train_loss))
                 train_accuracy.append(np.copy(epoch_train_accuracy))
-                valid_accuracy.append(np.copy(epoch_valid_accuracy))
+                # valid_accuracy.append(np.copy(epoch_valid_accuracy))
 
-                if epoch == 0 or (epoch > 0 and valid_accuracy[-1] > valid_accuracy[-2]):
-                    print("Saving model...")
-                    torch.save(self.linear.state_dict(), 'save/gen_linear.pt')
-                pd.DataFrame({'train_loss': train_loss, 'train_accuracy': train_accuracy, 'valid_accuracy': valid_accuracy}).to_csv('save/gen_results.csv', index=False)
+                # if epoch == 0 or (epoch > 0 and valid_accuracy[-1] > valid_accuracy[-2]):
+                #     print("Saving model...")
+                #     torch.save(self.linear.state_dict(), 'save/gen_linear.pt')
+                # pd.DataFrame({'train_loss': train_loss, 'train_accuracy': train_accuracy, 'valid_accuracy': valid_accuracy}).to_csv('save/gen_results.csv', index=False)
+                pd.DataFrame({'train_loss': train_loss, 'train_accuracy': train_accuracy}).to_csv('save/gen_results.csv', index=False)
+
             
-            print(f'Epoch: {epoch} complete | Train Loss: {train_loss[-1]} | Train Accuracy: {train_accuracy[-1]} | Valid Accuracy: {valid_accuracy[-1]}')
+            # print(f'Epoch: {epoch} complete | Train Loss: {train_loss[-1]} | Train Accuracy: {train_accuracy[-1]} | Valid Accuracy: {valid_accuracy[-1]}')
+            print(f'Epoch: {epoch} complete | Train Loss: {train_loss[-1]} | Train Accuracy: {train_accuracy[-1]}')
+
 
 
     def evaluate(self, model, data, tokenizer):
@@ -312,15 +316,15 @@ class Generate():
 
     def train_generation(self, model, data, tokenizer, optimizer, mode='train'):
         # generation training parameters
-        tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
-        model = GPT2LMHeadModel.from_pretrained('gpt2')
-        linear = nn.Linear(768, 4)
-        optimizer = optim.Adam(linear.parameters(), lr=3e-5)
-        loss_fn = torch.nn.CrossEntropyLoss()
+        # tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+        # model = GPT2LMHeadModel.from_pretrained('gpt2')
+        # linear = nn.Linear(768, 4)
+        # optimizer = optim.Adam(model.parameters(), lr=3e-5)
+        # loss_fn = torch.nn.CrossEntropyLoss()
 
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         model = model.to(device)
-        linear = linear.to(device)
+        # linear = linear.to(device)
 
         if mode == 'train':
             model.train()
@@ -339,22 +343,36 @@ class Generate():
             label = label.to(device)
 
             outputs = model(**inputs)
+            # outputs = model.generate(**inputs, max_length=len(inputs['input_ids'][0]+1))
+
             pred_logits = outputs.logits[0][-1]
+            # pred_logits = outputs[0][-1].float().unsqueeze(0)
+            
             vocab_probs = torch.softmax(pred_logits, dim=0)
             label_probs = [vocab_probs[self.label_inds[key]] for key in self.label_inds.keys()]
 
             pred_label_ind = torch.argmax(torch.tensor(label_probs), dim=0)
             pred_label = torch.tensor(list(self.label_inds.values()))[pred_label_ind]
 
-            linear_input = outputs.last_hidden_state.mean(dim=1) # average across sequence length
-            linear_input = linear_input.to(device)
+            # linear_input = outputs.last_hidden_state.mean(dim=1) # average across sequence length
+            # linear_input = linear_input.to(device)
 
-            linear_output = linear(linear_input)
-            loss = loss_fn(linear_output.unsqueeze(0), label.unsqueeze(0))
+            # linear_output = linear(linear_input)
+            # loss = loss_fn(linear_output.unsqueeze(0), label.unsqueeze(0))
+            loss = self.loss(pred_label.float().unsqueeze(0), label.float().unsqueeze(0))
+
+            # print(obs)
+            # print('===============')
+            # print(obs[-1])
+            # print('===============')
+            # print(label)
+            # print('===============')
+            # print(pred_label)
+            # print('===============')
 
             if mode == 'train':
                 optimizer.zero_grad()
-                loss.backward()
+                # loss.backward()
                 optimizer.step()
 
             losses.append(loss.item())
@@ -370,41 +388,7 @@ class Generate():
 
 
 
-    # def train_generation(model, linear, data, tokenizer, optimizer, mode='train'):
-    #     # generation training parameters
-    #     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
-    #     # model = GPT2LMHeadModel.from_pretrained('gpt2')
-    #     model = GPT2LMHeadModel.from_pretrained('gpt2_497')
-    #     optimizer = optim.Adam(model.parameters(), lr=3e-5)
-    #     # Add code to fine-tune and test your MCQA classifier.
-
-    #     device = torch.device("cuda")
-    #     model.cuda()
-    #     random.seed(42)
-    #     np.random.seed(42)
-    #     torch.manual_seed(42)
-    #     torch.cuda.manual_seed_all(42)
-
-    #     model = model.to(device)
-    #     epochs = 5
-    #     for epoch_i in range(0, epochs):
-
-    #     # ========================================
-    #     #               Training
-    #     # ========================================
-
-
-
-
-
-        
-    #     # configuration = GPT2Config.from_pretrained('gpt2', output_hidden_states=False)
-    #     # model = GPT2LMHeadModel.from_pretrained("gpt2", config=configuration)
-    #     # model.resize_token_embeddings(len(tokenizer))
-
-        
-
-
+    
 
 
 def create_plots():
