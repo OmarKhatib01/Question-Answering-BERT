@@ -1,15 +1,11 @@
 from transformers import AutoTokenizer, BertModel, GPT2LMHeadModel, GPT2Tokenizer
 import torch.optim as optim
-from torch.autograd import Variable
-
 import torch
 import json
 import numpy as np
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
-import random
-import torch.nn as nn
 
 class Classify():  
     def __init__(self):
@@ -180,7 +176,6 @@ class Classify():
 
 class Generate():
     def __init__(self):
-        # self.model = GPT2LMHeadModel.from_pretrained('gpt2')
         self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
         self.model = GPT2LMHeadModel.from_pretrained('gpt2')
 
@@ -241,16 +236,16 @@ class Generate():
     def train(self):
         # self.preprocess_data_text_file('train')
 
-        # command = \
-        #     "python3 -u models/transformers/examples/pytorch/language-modeling/run_clm.py \
-        #     --model_name_or_path gpt2 \
-        #     --train_file data/train.txt \
-        #     --do_train \
-        #     --output_dir models/gpt497 \
-        #     --per_device_train_batch_size 2 \
-        #     --num_train_epochs 5\
-        #     >& save/output.log"
-        # os.system(command)
+        command = \
+            "python3 -u models/transformers/examples/pytorch/language-modeling/run_clm.py \
+            --model_name_or_path gpt2 \
+            --train_file data/train.txt \
+            --do_train \
+            --output_dir models/gpt497 \
+            --per_device_train_batch_size 2 \
+            --num_train_epochs 5\
+            >& save/output.log"
+        os.system(command)
 
         # command = \
         #     "python3 -u models/transformers/examples/pytorch/question-answering/run_qa.py \
@@ -272,31 +267,30 @@ class Generate():
         #     print(f"Validation accuracy: {self.evaluate_model(self.model, self.valid_set, self.tokenizer)}")
 
 
-        train_loss = []
-        train_accuracy = []
-        valid_accuracy = []
-        for epoch in range(1):     # 15
-            print(f"Starting training epoch {epoch}")
-            # epoch_train_loss, epoch_train_accuracy = self.train_generation(self.model, self.train_set, self.tokenizer, self.optimizer)
-            epoch_train_loss = self.train_generation(self.model, self.train_set, self.tokenizer, self.optimizer)
+        # train_loss = []
+        # train_accuracy = []
+        # valid_accuracy = []
+        # for epoch in range(1):     # 15
+        #     print(f"Starting training epoch {epoch}")
+        #     # epoch_train_loss, epoch_train_accuracy = self.train_generation(self.model, self.train_set, self.tokenizer, self.optimizer)
+        #     epoch_train_loss = self.train_generation(self.model, self.train_set, self.tokenizer, self.optimizer)
             
-            with torch.no_grad():
-                print(f"Validating epoch {epoch}")
-                # epoch_valid_accuracy = self.evaluate_model(self.model, self.linear, self.valid_set, self.tokenizer)
-                train_loss.append(np.copy(epoch_train_loss))
-                # train_accuracy.append(np.copy(epoch_train_accuracy))
-                # valid_accuracy.append(np.copy(epoch_valid_accuracy))
+        #     with torch.no_grad():
+        #         print(f"Validating epoch {epoch}")
+        #         # epoch_valid_accuracy = self.evaluate_model(self.model, self.linear, self.valid_set, self.tokenizer)
+        #         train_loss.append(np.copy(epoch_train_loss))
+        #         # train_accuracy.append(np.copy(epoch_train_accuracy))
+        #         # valid_accuracy.append(np.copy(epoch_valid_accuracy))
 
-                # if epoch == 0 or (epoch > 0 and valid_accuracy[-1] > valid_accuracy[-2]):
-                #     print("Saving model...")
-                #     torch.save(self.linear.state_dict(), 'save/gen_linear.pt')
-                # pd.DataFrame({'train_loss': train_loss, 'train_accuracy': train_accuracy, 'valid_accuracy': valid_accuracy}).to_csv('save/gen_results.csv', index=False)
-                pd.DataFrame({'train_loss': train_loss, 'train_accuracy': train_accuracy}).to_csv('save/gen_results.csv', index=False)
+        #         # if epoch == 0 or (epoch > 0 and valid_accuracy[-1] > valid_accuracy[-2]):
+        #         #     print("Saving model...")
+        #         #     torch.save(self.linear.state_dict(), 'save/gen_linear.pt')
+        #         # pd.DataFrame({'train_loss': train_loss, 'train_accuracy': train_accuracy, 'valid_accuracy': valid_accuracy}).to_csv('save/gen_results.csv', index=False)
+        #         pd.DataFrame({'train_loss': train_loss, 'train_accuracy': train_accuracy}).to_csv('save/gen_results.csv', index=False)
 
             
-            # print(f'Epoch: {epoch} complete | Train Loss: {train_loss[-1]} | Train Accuracy: {train_accuracy[-1]} | Valid Accuracy: {valid_accuracy[-1]}')
-            print(f'Epoch: {epoch} complete | Train Loss: {train_loss[-1]} | Train Accuracy: {train_accuracy[-1]}')
-
+        #     # print(f'Epoch: {epoch} complete | Train Loss: {train_loss[-1]} | Train Accuracy: {train_accuracy[-1]} | Valid Accuracy: {valid_accuracy[-1]}')
+        #     print(f'Epoch: {epoch} complete | Train Loss: {train_loss[-1]} | Train Accuracy: {train_accuracy[-1]}')
 
 
     def evaluate(self, model, data, tokenizer):
@@ -306,7 +300,7 @@ class Generate():
 
             # for calculating avg accuracy every N iterations
             correct_preds = 0
-            for i in range(1):  # len(data)
+            for i in range(len(data)):  # len(data)
                 obs = data[i]
                 inputs = tokenizer(obs[:-1], truncation=True, return_tensors="pt")
                 label = tokenizer(obs[-1], truncation=True, return_tensors="pt")['input_ids'][0][0]
@@ -321,18 +315,7 @@ class Generate():
 
                 if pred_label == label:
                     correct_preds += 1
-                    # print(self.labels[pred_label-32], self.labels[label-32], 'Correct')
 
-                print('obs: ', obs )
-                print("===============")
-                print('input: ', obs[:-1])
-                print("===============")
-                print('label: ', obs[-1])
-                print("===============")
-                print('pred_label: ', pred_label)
-                print('tokenizer.decode(pred_label --> ', tokenizer.decode(pred_label, skip_special_tokens=True))
-                print("===============")
-            
             accuracy = correct_preds/len(data)
             return accuracy
         
@@ -343,7 +326,8 @@ class Generate():
 
         return valid_acc, test_acc
 
-    def train_generation(self, model, data, tokenizer, optimizer, mode='train'):
+    # Attempt 1
+    # def train_generation(self, model, data, tokenizer, optimizer, mode='train'):
         # generation training parameters
         # tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
         # model = GPT2LMHeadModel.from_pretrained('gpt2')
@@ -428,6 +412,7 @@ class Generate():
         # return accuracy, losses
         return losses
 
+    # Attempt 2
     # def train_generation(self, model, data, tokenizer, optimizer, mode='train'):
     #     # generation training parameters
     #     # tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
@@ -503,7 +488,29 @@ class Generate():
 
     #     return accuracy, losses
 
-    
+
+    # def zero_shot(self, data):
+    #     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+    #     model = GPT2LMHeadModel.from_pretrained('gpt2')
+    #     tokenizer.pad_token_id = tokenizer.eos_token_id
+
+    #     for i in range(5): # len(data)
+    #         obs = data[i]
+    #         inputs = tokenizer(obs[:-1], return_tensors="pt")
+    #         # Print the scores for each token generated with Greedy Search
+    #         outputs = model.generate(**inputs, max_new_tokens=10, return_dict_in_generate=True, output_scores=True)
+    #         # max_length=len(inputs[0])+1
+
+    #         transition_scores = model.compute_transition_scores(outputs.sequences, outputs.scores, normalize_logits=True)
+    #         input_length = inputs.input_ids.shape[1]
+    #         generated_tokens = outputs.sequences[:, input_length:]
+
+    #         result = {}
+
+    #         for tok, score in zip(generated_tokens[0], transition_scores[0]):
+    #             if tokenizer.decode(tok).strip() == 'A':
+    #                 # | token | token string | logits | probability
+    #                 print(f"| {tok:5d} | {tokenizer.decode(tok):8s} | {score.numpy():.3f} | {np.exp(score.numpy()):.2%}")
 
 
 def create_plots():
@@ -515,16 +522,29 @@ def create_plots():
     plt.savefig('save/classifier_train_test_acc.png')
                  
 if __name__ == "__main__":
-    # classifier = Classify()
-    # # classifier.train()
-    # valid_acc, test_acc = classifier.test()
-    # print(f"CLASSIFIER Validation accuracy: {valid_acc} | Test accuracy: {test_acc}")
-    # create_plots()
+    classifier = Classify()
+    # classifier.train()
+    valid_acc, test_acc = classifier.test()
+    print(f"CLASSIFIER Validation accuracy: {valid_acc} | Test accuracy: {test_acc}")
+    create_plots()
+
 
     generator = Generate()
-    generator.train()
+    # for training
+    # generator.train()
+
+    # for fine-tune validating and testing
     # valid_acc, test_acc = generator.test()
     # print(f"GENERATOR Validation accuracy: {valid_acc} | Test accuracy: {test_acc}")
+
+    # for zero-shot accuracies on the validation and test sets
+    tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+    model = GPT2LMHeadModel.from_pretrained('gpt2')
+    tokenizer.pad_token_id = tokenizer.eos_token_id
+
+    valid_acc = generator.evaluate(model, generator.valid_set, tokenizer)
+    test_acc = generator.evaluate(model, generator.test_set, tokenizer)
+    print(f"zero-shot GENERATOR Validation accuracy: {valid_acc} | Test accuracy: {test_acc}")
 
 
 
@@ -582,3 +602,6 @@ if __name__ == "__main__":
 #         model = GPT2LMHeadModel.from_pretrained('gpt2')
 #         optimizer = optim.Adam(model.parameters(), lr=3e-5)
 #    Add code to fine-tune and test your MCQA classifier.
+
+
+
